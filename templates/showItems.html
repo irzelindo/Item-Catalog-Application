@@ -1,0 +1,55 @@
+{% extends "main.html" %} {% block content %} {% include "header.html" %}
+<div class="row navbar-margin"></div>
+
+{% with messages = get_flashed_messages() %} {% if messages %} {% for message in messages %}
+<div class="alert alert-info alert-dismissable">
+  <a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>
+  <strong>Info!</strong> {{message}}.
+</div>
+{% endfor %} {% endif %} {% endwith %}
+
+<div class="row">
+  <div class="col-12">
+    <h2>
+      {{catalog.name}}
+    </h2>
+    <a href="{{url_for('editCatalog', catalog_id = catalog.id)}}">
+      <button type="button" class="btn btn-light-blue">
+        Edit
+      </button>
+    </a>
+    <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#deleteModal">
+      <i class="fa fa-trash-o"></i>
+      Delete
+    </button>
+  </div>
+</div>
+<div class="row">
+  <div class="list-group catalogs-list list-separator col-6">
+    {% for item in items %}
+    <a href="{{url_for('itemDescription', catalog_id = catalog.id, item_id = item.id)}}" class="list-group-item list-group-item-action">
+      <strong>{{item.title}}</strong>
+    </a> {% endfor %}
+  </div>
+  <!-- Modals -->
+  <div class="modal fade" id="deleteModal" role="dialog">
+    <div class="modal-dialog">
+      <!-- Modal content-->
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5>Do you really want to delete <strong>{{catalog.name}}</strong> catalog?</h5>
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+        </div>
+        <div class="modal-footer">
+          <div class="text-center">
+            <a href="{{url_for('deleteCatalog', catalog_id = catalog.id)}}">
+              <button type="button" class="btn btn-light-blue">Yes</button>
+            </a>
+          </div>
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% include "footer.html" %} {% endblock %}

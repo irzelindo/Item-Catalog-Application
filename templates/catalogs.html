@@ -1,0 +1,27 @@
+{% extends "main.html" %} {% block content %} {% include "header.html" %}
+<div class="row navbar-margin"></div>
+
+{% with messages = get_flashed_messages() %} {% if messages %} {% for message in messages %}
+<div class="alert alert-info alert-dismissable">
+  <a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>
+  <strong>Info!</strong> {{message}}.
+</div>
+{% endfor %} {% endif %} {% endwith %}
+
+<div class="row">
+  <div class="list-group catalogs-list list-separator col-5">
+    <h2>Categories</h2> {% for catalog in catalogs %}
+    <a href="{{url_for('showItems', catalog_id = catalog.id)}}" class="list-group-item list-group-item-action"><strong>{{catalog.name}}</strong></a> {% endfor %}
+  </div>
+
+  <div class="list-group catalogs-list list-separator col-6">
+    <h2>Latest Items</h2>
+    <a href="{{url_for('newItem')}}">
+      <button type="button" class="btn btn-light-blue">
+        New Item
+      </button>
+    </a>{% for item in items %}
+    <a href="{{url_for('itemDescription', catalog_id = item[1].id, item_id = item[0].id)}}" class="list-group-item list-group-item-action"><strong>{{item[0].title}}</strong><i class="ml-2">({{item[1].name}})</i></a> {% endfor %}
+  </div>
+</div>
+{% include "footer.html" %}{% endblock %}
