@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, jsonify, url_for, flash, get_flashed_messages
-from sqlalchemy import create_engine, desc
+from sqlalchemy import create_engine, desc, asc
 from sqlalchemy.orm import sessionmaker
-from database_setup import Base, Catalog, Item
+from database_setup import Base, Catalog, Item, User
 from flask import session as login_session
 
 import random
@@ -22,6 +22,168 @@ Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
+CLIENT_ID = json.loads(
+    open('client_secrets.json', 'r').read())['web']['client_id']
+APPLICATION_NAME = "Item Catalog App"
+
+
+@app.route('/login')
+def showLogin():
+    state = ''.join(random.choice(string.ascii_uppercase + string.digits)
+                    for x in xrange(32))
+    # Add to client session the state string in order to preven anti-forgery
+    login_session['state'] = state
+    return render_template('login.html', STATE=state)
+
+
+@app.route('/disconnect')
+def disconnect():
+    if 'provider' in login_session:
+        if login_session['provider'] == 'google':
+            gdisconnect()
+        if login_session['provider'] == 'facebook':
+            fbdisconnect()
+        login_session.clear()
+        flash("You have successfully been logged out.")
+        return redirect(url_for('showCatalogs'))
+    else:
+        flash("You were not logged in")
+        return redirect(url_for('showCatalogs'))
+
+
+@app.route('/gconnect', methods=['POST'])
+def gconnect():
+    # Validate state token
+    if request.args.get('state') != login_session['state']:
+        response = make_response(json.dumps('Invalid state parameter.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    # Obtain authorization code
+    code = request.data
+    try:
+        # Upgrade the authorization code into a credentials object
+        oauth_flow = flow_from_clientsecrets('client_secrets.json', scope='')
+        oauth_flow.redirect_uri = 'postmessage'
+        credentials = oauth_flow.step2_exchange(code)
+    except FlowExchangeError:
+        response = make_response(
+            json.dumps('Failed to upgrade the authorization code.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    # Check that the access token is valid.
+    access_token = credentials.access_token
+    url = ('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=%s'
+           % access_token)
+    h = httplib2.Http()
+    result = json.loads(h.request(url, 'GET')[1])
+    # If there was an error in the access token info, abort.
+    if result.get('error') is not None:
+        response = make_response(json.dumps(result.get('error')), 500)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    # Verify that the access token is used for the intended user.
+    gplus_id = credentials.id_token['sub']
+    if result['user_id'] != gplus_id:
+        response = make_response(
+            json.dumps("Token's user ID doesn't match given user ID."), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    # Verify that the access token is valid for this app.
+    if result['issued_to'] != CLIENT_ID:
+        response = make_response(
+            json.dumps("Token's client ID does not match app's."), 401)
+        print "Token's client ID does not match app's."
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    stored_access_token = login_session.get('access_token')
+    stored_gplus_id = login_session.get('gplus_id')
+    if stored_access_token is not None and gplus_id == stored_gplus_id:
+        response = make_response(json.dumps('Current user is already connected.'),
+                                 200)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    # Store the access token in the session for later use.
+    login_session['access_token'] = credentials.access_token
+    login_session['gplus_id'] = gplus_id
+
+    # Get user info
+    userinfo_url = "https://www.googleapis.com/oauth2/v1/userinfo"
+    params = {'access_token': credentials.access_token, 'alt': 'json'}
+    answer = requests.get(userinfo_url, params=params)
+
+    data = answer.json()
+
+    login_session['username'] = data['name']
+    login_session['picture'] = data['picture']
+    login_session['email'] = data['email']
+    # ADD PROVIDER TO LOGIN SESSION
+    login_session['provider'] = 'google'
+    print(login_session)
+    # see if user exists, if it doesn't make a new one
+    user_id = getUserID(data["email"])
+    if not user_id:
+        user_id = createUser(login_session)
+    login_session['user_id'] = user_id
+
+    output = """
+        <h4 class="card-title">Welcome</h4>
+        <p>{}</p>
+        <img src='{}' style = "width: 75px; height: 75px;border-radius: 150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;">
+    """.format(login_session['username'], login_session['picture'])
+    flash("you are now logged in as %s" % login_session['username'])
+
+    return output
+
+
+@app.route('/gdisconnect')
+def gdisconnect():
+    # Only disconnect a connected user.
+    access_token = login_session.get('access_token')
+    if access_token is None:
+        response = make_response(
+            json.dumps('Current user not connected.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    url = 'https://accounts.google.com/o/oauth2/revoke?token=%s' % access_token
+    h = httplib2.Http()
+    result = h.request(url, 'GET')[0]
+    if result['status'] == '200':
+        response = make_response(json.dumps('Successfully disconnected.'), 200)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    else:
+        response = make_response(json.dumps(
+            'Failed to revoke token for given user.', 400))
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+
+def createUser(login_session):
+    newUser = User(name=login_session['username'], email=login_session[
+                   'email'], picture=login_session['picture'])
+    session.add(newUser)
+    session.commit()
+    user = session.query(User).filter_by(email=login_session['email']).one()
+    return user.id
+
+
+def getUserInfo(user_id):
+    user = session.query(User).filter_by(id=user_id).one()
+    return user
+
+
+def getUserID(email):
+    try:
+        user = session.query(User).filter_by(email=email).one()
+        return user.id
+    except:
+        return None
+
 
 @app.route('/')
 @app.route('/catalog/')
@@ -34,9 +196,14 @@ def showCatalogs():
 
 @app.route('/catalog/new/', methods=['GET', 'POST'])
 def newCatalog():
+    if 'username' not in login_session:
+        flash("To create one category you must be logged in")
+        return redirect('/login')
+
     if request.method == 'POST':
         if request.form['catalog']:
-            newCatalog = Catalog(name=request.form['catalog'])
+            newCatalog = Catalog(
+                name=request.form['catalog'], user_id=login_session['user_id'])
             session.add(newCatalog)
             session.commit()
             flash("{} added to Catalogs".format(request.form['catalog']))
@@ -53,6 +220,12 @@ def editCatalog(catalog_id):
     catalog = session.query(
         Catalog).filter_by(id=catalog_id).one()
     catalogBefore = catalog.name
+    if 'username' not in login_session:
+        flash("To edit a category you must be logged in")
+        return redirect('/login')
+    if catalog.user_id != login_session['user_id']:
+        flash("You a not authorized to edit {} category".format(catalogBefore))
+        return redirect(url_for('showItems', catalog_id=catalog.id))
     if request.method == 'POST':
         if request.form['catalog']:
             catalog.name = request.form['catalog']
@@ -70,10 +243,17 @@ def editCatalog(catalog_id):
 def deleteCatalog(catalog_id):
     catalog = session.query(
         Catalog).filter_by(id=catalog_id).one()
-    session.delete(catalog)
-    flash("Catalog {} successfully deleted".format(catalog.name))
-    session.commit()
-    return redirect(url_for('showCatalogs'))
+    if 'username' not in login_session:
+        flash("To delete a category you must be logged in")
+        return redirect('/login')
+    if catalog.user_id != login_session['user_id']:
+        flash("You a not authorized to delete {} category".format(catalog.name))
+        return redirect(url_for('showItems', catalog_id=catalog.id))
+    else:
+        session.delete(catalog)
+        flash("Catalog {} successfully deleted".format(catalog.name))
+        session.commit()
+        return redirect(url_for('showCatalogs'))
 
 
 @app.route('/catalog/<int:catalog_id>/items/')
@@ -88,14 +268,18 @@ def showItems(catalog_id):
 def newItem():
     catalogs = session.query(Catalog).all()
     if request.method == 'POST':
+        if 'username' not in login_session:
+            flash("To create a new item you must be logged in")
+            return redirect('/login')
         catalog = session.query(Catalog).filter_by(
             name=request.form['category']).one()
         if request.form['title'] and request.form['category'] and request.form['description']:
             newItem = Item(title=request.form['title'],
-                           description=request.form['description'], catalog_id=catalog.id)
+                           description=request.form['description'],
+                           catalog_id=catalog.id, user_id=login_session['user_id'])
             session.add(newItem)
             session.commit()
-            flash("New Item added to {} Catalog".format(catalog.name))
+            flash("New Item added to {} category".format(catalog.name))
             return redirect(url_for('showItems', catalog_id=catalog.id))
         else:
             flash("Couldn't create new Item")
@@ -111,7 +295,14 @@ def editItem(catalog_id, item_id):
         Catalog).filter_by(id=catalog_id).one()
     item = session.query(Item).filter_by(id=item_id).one()
     itemBefore = item.title
+    if 'username' not in login_session:
+        flash("To edit an item you must be logged in")
+        return redirect('/login')
     if request.method == 'POST':
+        if item.user_id != login_session['user_id']:
+            flash("You a not authorized to edit this item")
+            return render_template('editItem.html', item=item,
+                                   catalogs=catalogs, catalog=catalog)
         if request.form['title'] and request.form['category'] and request.form['description']:
             item.title = request.form['title']
             item.description = request.form['description']
@@ -123,7 +314,8 @@ def editItem(catalog_id, item_id):
             flash("Nothing Changed")
             return redirect(url_for('showItems', catalog_id=catalog.id))
     else:
-        return render_template('editItem.html', item=item, catalogs=catalogs, catalog=catalog)
+        return render_template('editItem.html', item=item,
+                               catalogs=catalogs, catalog=catalog)
 
 
 @app.route('/catalog/<int:catalog_id>/items/<int:item_id>/')
@@ -135,12 +327,21 @@ def itemDescription(catalog_id, item_id):
 
 @app.route('/catalog/<int:catalog_id>/items/<int:item_id>/delete/')
 def deleteItem(catalog_id, item_id):
+    catalog = session.query(Catalog).filter_by(id=catalog_id).one()
     item = session.query(
         Item).filter_by(id=item_id).one()
-    session.delete(item)
-    flash("{} successfully deleted".format(item.title))
-    session.commit()
-    return redirect(url_for('showItems', catalog_id=catalog_id))
+    if 'username' not in login_session:
+        flash("To delete an item you must be logged in")
+        return redirect('/login')
+    if item.user_id != login_session['user_id']:
+        flash("You a not authorized to delete this item")
+        return redirect(url_for('itemDescription',
+                                catalog_id=catalog.id, item_id=item.id))
+    else:
+        session.delete(item)
+        flash("{} successfully deleted".format(item.title))
+        session.commit()
+        return redirect(url_for('showItems', catalog_id=catalog_id))
 
 
 if __name__ == '__main__':
