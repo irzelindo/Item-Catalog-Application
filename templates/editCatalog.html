@@ -9,11 +9,10 @@
 </div>
 
 <div class="row">
-  <!-- Modals -->
-  <form action="#" method="POST">
+  <div class="col-1"></div>
+  <form action="#" method="POST" class="col-10">
     <div class="modal-body">
       <div class="md-form">
-        <i class="fa fa-edit prefix grey-text"></i>
         <input type="text" name="catalog" class="form-control" placeholder="{{catalog.name}}" />
         <label for="orangeForm-name">Edit Catalog Name</label>
       </div>
@@ -25,5 +24,6 @@
       </a>
     </div>
   </form>
+  <div class="col-1"></div>
 </div>
-{% include "footer.html" %} {% endblock %}
+{% endblock %}
