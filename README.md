@@ -1,6 +1,6 @@
-#Item Catalog App
+## Item Catalog App ##
 
-##Project Description
+## Project Description ##
 
 The gain in this project is to develop an application that provides a list of
 items within a variety of categories as well as provide a user registration and
@@ -9,7 +9,7 @@ delete their own items.
 
 ***
 
-##Requirements
+## Requirements ##
 
 Here are the steps need in order to run this project:
 
@@ -23,7 +23,7 @@ Just navigate to catalog file under the vagrant file and clone [Item Catalog App
 
 ***
 
-##Packages
+## Packages ##
 In order to run the app you will need to Install:
 1. [flask](http://flask.pocoo.org/)
 2. [sqlalchemy](http://docs.sqlalchemy.org/en/latest/intro.html#installation-guide)
@@ -32,7 +32,7 @@ In order to run the app you will need to Install:
 
 ***
 
-##Run the Application
+## Run the Application ##
 Navigate to **Item-catalog-Application** in this folder you will find this subfolders:
 1. static - where I placed all static files such as *css, images, javascript and etc...*
 2. templates - where I placed all templates I used in this project.
