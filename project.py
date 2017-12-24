@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, jsonify, url_for, flash, get_flashed_messages
+from flask import (Flask, render_template, request, redirect, jsonify, url_for,
+                   flash, get_flashed_messages)
 from sqlalchemy import create_engine, desc, asc
 from sqlalchemy.orm import sessionmaker
 from database_setup import Base, Catalog, Item, User
@@ -25,6 +26,19 @@ session = DBSession()
 CLIENT_ID = json.loads(
     open('client_secrets.json', 'r').read())['web']['client_id']
 APPLICATION_NAME = "Item Catalog App"
+
+
+@app.route('/catalog/json')
+def catalogsJson():
+    catalogs = session.query(Catalog).all()
+    return jsonify(catalogs=[c.serialize for c in catalogs])
+
+
+@app.route('/catalog/<int:catalog_id>/items/json')
+def catalogsItemsJson(catalog_id):
+    items_catalog = session.query(Item).filter_by(
+        catalog_id=catalog_id).all()
+    return jsonify(items=[i.serialize for i in items_catalog])
 
 
 @app.route('/login')
@@ -130,13 +144,8 @@ def gconnect():
         user_id = createUser(login_session)
     login_session['user_id'] = user_id
 
-    output = """
-        <h4 class="card-title">Welcome</h4>
-        <p>{}</p>
-        <img src='{}' style = "width: 75px; height: 75px;border-radius: 150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;">
-    """.format(login_session['username'], login_session['picture'])
-    flash("you are now logged in as %s" % login_session['username'])
-
+    output = "<h6><strong>Redirecting...</strong></h6>"
+    flash("Welcome {} you are now logged in".format(login_session['username']))
     return output
 
 
@@ -161,6 +170,70 @@ def gdisconnect():
             'Failed to revoke token for given user.', 400))
         response.headers['Content-Type'] = 'application/json'
         return response
+
+
+@app.route('/fbconnect', methods=['POST'])
+def fbconnect():
+    if request.args.get('state') != login_session['state']:
+        response = make_response(json.dumps('Invalid state parameter.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    access_token = request.data
+
+    app_id = json.loads(open('fb_client_secrets.json', 'r').read())[
+        'web']['app_id']
+    app_secret = json.loads(
+        open('fb_client_secrets.json', 'r').read())['web']['app_secret']
+    url = 'https://graph.facebook.com/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s' % (
+        app_id, app_secret, access_token)
+    h = httplib2.Http()
+    result = h.request(url, 'GET')[1]
+
+    # Use token to get user info from API
+    userinfo_url = "https://graph.facebook.com/v2.8/me"
+    token = result.split(',')[0].split(':')[1].replace('"', '')
+
+    url = 'https://graph.facebook.com/v2.8/me?access_token=%s&fields=name,id,email' % token
+    h = httplib2.Http()
+    result = h.request(url, 'GET')[1]
+    # print "url sent for API access:%s"% url
+    # print "API JSON result: %s" % result
+    data = json.loads(result)
+    login_session['provider'] = 'facebook'
+    login_session['username'] = data["name"]
+    login_session['email'] = data["email"]
+    login_session['facebook_id'] = data["id"]
+
+    # The token must be stored in the login_session in order to properly logout
+    login_session['access_token'] = token
+
+    # Get user picture
+    url = 'https://graph.facebook.com/v2.8/me/picture?access_token=%s&redirect=0&height=200&width=200' % token
+    h = httplib2.Http()
+    result = h.request(url, 'GET')[1]
+    data = json.loads(result)
+
+    login_session['picture'] = data["data"]["url"]
+
+    # see if user exists
+    user_id = getUserID(login_session['email'])
+    if not user_id:
+        user_id = createUser(login_session)
+    login_session['user_id'] = user_id
+    output = "<h6><strong>Redirecting...</strong></h6>"
+    flash("Welcome {} you are now logged in".format(login_session['username']))
+    return output
+
+
+@app.route('/fbdisconnect')
+def fbdisconnect():
+    facebook_id = login_session['facebook_id']
+    access_token = login_session['access_token']
+    url = 'https://graph.facebook.com/%s/permissions?access_token=%s' % (
+        facebook_id, access_token)
+    h = httplib2.Http()
+    result = h.request(url, 'DELETE')[1]
+    return "you have been logged out"
 
 
 def createUser(login_session):
@@ -206,10 +279,10 @@ def newCatalog():
                 name=request.form['catalog'], user_id=login_session['user_id'])
             session.add(newCatalog)
             session.commit()
-            flash("{} added to Catalogs".format(request.form['catalog']))
+            flash("{} added to Categories".format(request.form['catalog']))
             return redirect(url_for('showCatalogs'))
         else:
-            flash("Cannot create empty catalog")
+            flash("Cannot create empty category")
             return render_template('newCatalog.html')
     else:
         return render_template('newCatalog.html')
