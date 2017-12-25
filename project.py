@@ -275,10 +275,13 @@ def showCatalogs():
 
 @app.route('/catalog/new/', methods=['GET', 'POST'])
 def newCatalog():
+    # First check the user state, if key <username> is in session
     if 'username' not in login_session:
         flash("To create one category you must be logged in")
+        # If user is not logged will be redirected to login page
         return redirect('/login')
 
+    # Check if request method is POST. to catch data from the Form & add to the DB
     if request.method == 'POST':
         if request.form['catalog']:
             newCatalog = Catalog(
@@ -296,12 +299,14 @@ def newCatalog():
 
 @app.route('/catalog/<int:catalog_id>/edit/', methods=['GET', 'POST'])
 def editCatalog(catalog_id):
+    # To edit one category user must be logged in & be the category creator
     if 'username' not in login_session:
         flash("To edit a category you must be logged in")
         return redirect('/login')
     else:
         catalog = session.query(Catalog).filter_by(id=catalog_id).one()
         catalogBefore = catalog.name
+    # Check if user is the category creator
     if catalog.user_id != login_session['user_id']:
         flash("You a not authorized to edit {} category".format(catalogBefore))
         return redirect(url_for('showItems', catalog_id=catalog.id))
@@ -312,14 +317,18 @@ def editCatalog(catalog_id):
                 catalogBefore, catalog.name))
             return redirect(url_for('showCatalogs'))
         else:
+            # If user doesn't edit specific category msg below is displayed
             flash("Nothing Changed")
+            # Redirecting the user to respective category page
             return redirect(url_for('showItems', catalog_id=catalog.id))
     else:
+        # If method is not POST edit catalog template is displayed
         return render_template('editCatalog.html', catalog=catalog)
 
 
 @app.route('/catalog/<int:catalog_id>/delete/')
 def deleteCatalog(catalog_id):
+    # To delete one category user must be logged in & be the category creator
     if 'username' not in login_session:
         flash("To delete a category you must be logged in")
         return redirect('/login')
