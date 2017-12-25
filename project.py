@@ -296,12 +296,12 @@ def newCatalog():
 
 @app.route('/catalog/<int:catalog_id>/edit/', methods=['GET', 'POST'])
 def editCatalog(catalog_id):
-    catalog = session.query(
-        Catalog).filter_by(id=catalog_id).one()
-    catalogBefore = catalog.name
     if 'username' not in login_session:
         flash("To edit a category you must be logged in")
         return redirect('/login')
+    else:
+        catalog = session.query(Catalog).filter_by(id=catalog_id).one()
+        catalogBefore = catalog.name
     if catalog.user_id != login_session['user_id']:
         flash("You a not authorized to edit {} category".format(catalogBefore))
         return redirect(url_for('showItems', catalog_id=catalog.id))
@@ -320,17 +320,17 @@ def editCatalog(catalog_id):
 
 @app.route('/catalog/<int:catalog_id>/delete/')
 def deleteCatalog(catalog_id):
-    catalog = session.query(
-        Catalog).filter_by(id=catalog_id).one()
     if 'username' not in login_session:
         flash("To delete a category you must be logged in")
         return redirect('/login')
+    else:
+        catalog = session.query(Catalog).filter_by(id=catalog_id).one()
     if catalog.user_id != login_session['user_id']:
         flash("You a not authorized to delete {} category".format(catalog.name))
         return redirect(url_for('showItems', catalog_id=catalog.id))
     else:
         session.delete(catalog)
-        flash("Catalog {} successfully deleted".format(catalog.name))
+        flash("Category {} successfully deleted".format(catalog.name))
         session.commit()
         return redirect(url_for('showCatalogs'))
 
@@ -345,11 +345,12 @@ def showItems(catalog_id):
 
 @app.route('/catalog/newItem/', methods=['GET', 'POST'])
 def newItem():
-    catalogs = session.query(Catalog).all()
+    if 'username' not in login_session:
+        flash("To create a new item you must be logged in")
+        return redirect('/login')
+    else:
+        catalogs = session.query(Catalog).all()
     if request.method == 'POST':
-        if 'username' not in login_session:
-            flash("To create a new item you must be logged in")
-            return redirect('/login')
         catalog = session.query(Catalog).filter_by(
             name=request.form['category']).one()
         if request.form['title'] and request.form['category'] and request.form['description']:
@@ -369,14 +370,14 @@ def newItem():
 
 @app.route('/catalog/<int:catalog_id>/items/<int:item_id>/edit/', methods=['GET', 'POST'])
 def editItem(catalog_id, item_id):
-    catalogs = session.query(Catalog).all()
-    catalog = session.query(
-        Catalog).filter_by(id=catalog_id).one()
-    item = session.query(Item).filter_by(id=item_id).one()
-    itemBefore = item.title
     if 'username' not in login_session:
         flash("To edit an item you must be logged in")
         return redirect('/login')
+    else:
+        catalogs = session.query(Catalog).all()
+        catalog = session.query(Catalog).filter_by(id=catalog_id).one()
+        item = session.query(Item).filter_by(id=item_id).one()
+        itemBefore = item.title
     if request.method == 'POST':
         if item.user_id != login_session['user_id']:
             flash("You a not authorized to edit this item")
@@ -406,12 +407,13 @@ def itemDescription(catalog_id, item_id):
 
 @app.route('/catalog/<int:catalog_id>/items/<int:item_id>/delete/')
 def deleteItem(catalog_id, item_id):
-    catalog = session.query(Catalog).filter_by(id=catalog_id).one()
-    item = session.query(
-        Item).filter_by(id=item_id).one()
     if 'username' not in login_session:
         flash("To delete an item you must be logged in")
         return redirect('/login')
+    else:
+        catalog = session.query(Catalog).filter_by(id=catalog_id).one()
+        item = session.query(Item).filter_by(id=item_id).one()
+
     if item.user_id != login_session['user_id']:
         flash("You a not authorized to delete this item")
         return redirect(url_for('itemDescription',
