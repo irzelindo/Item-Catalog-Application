@@ -9,8 +9,8 @@ Base = declarative_base()
 
 
 class User(Base):
+    """Setting up user table"""
     __tablename__ = 'user'
-
     id = Column(Integer, primary_key=True)
     name = Column(String(250), nullable=False)
     email = Column(String(250), nullable=False)
@@ -28,8 +28,8 @@ class User(Base):
 
 
 class Catalog(Base):
+    """Setting up Catalogs table"""
     __tablename__ = "catalog"
-
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
 
@@ -47,8 +47,8 @@ class Catalog(Base):
 
 
 class Item(Base):
+    """Setting up Item table"""
     __tablename__ = "item"
-
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     date = Column(DateTime, default=datetime.now(

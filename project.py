@@ -1,5 +1,11 @@
-from flask import (Flask, render_template, request, redirect, jsonify, url_for,
-                   flash, get_flashed_messages)
+from flask import (Flask,
+                   render_template,
+                   request,
+                   redirect,
+                   jsonify,
+                   url_for,
+                   flash,
+                   get_flashed_messages)
 from sqlalchemy import create_engine, desc, asc
 from sqlalchemy.orm import sessionmaker
 from database_setup import Base, Catalog, Item, User
