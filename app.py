@@ -6,7 +6,7 @@ from flask import (Flask,
                    url_for,
                    flash,
                    get_flashed_messages)
-from sqlalchemy import create_engine, desc, asc
+from sqlalchemy import create_engine, desc
 from sqlalchemy.orm import sessionmaker
 from database_setup import Base, Catalog, Item, User
 from flask import session as login_session
@@ -436,6 +436,6 @@ def deleteItem(catalog_id, item_id):
 
 if __name__ == '__main__':
     app.secret_key = 'super_secret_key'
-    #app.debug = True
-    #app.run(host='0.0.0.0', port=8000)
-    app.run(debug=True, use_reloaders=True)
+    app.debug = True
+    app.run(host='0.0.0.0')
+    # app.run()
