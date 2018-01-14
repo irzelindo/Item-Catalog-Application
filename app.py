@@ -434,8 +434,8 @@ def deleteItem(catalog_id, item_id):
         return redirect(url_for('showItems', catalog_id=catalog_id))
 
 
-if __name__ == '__main__':
-    app.secret_key = 'super_secret_key'
-    app.debug = True
+#if __name__ == '__main__':
+app.secret_key = 'super_secret_key'
+app.debug = True
     #app.run(host='0.0.0.0', port=8000)
-    app.run()
+    #app.run()
