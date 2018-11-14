@@ -17,7 +17,7 @@ pycodestyle==2.3.1
 PyJWT==1.5.2
 PySocks==1.6.7
 pytz==2017.2
-requests==2.18.3
+requests==2.20.0
 six==1.10.0
 twilio==6.5.1
 urllib3==1.22
